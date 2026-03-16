@@ -1,0 +1,383 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AgentWallet — Governance Infrastructure for AI Agents</title>
+<meta name="description" content="Spend controls, kill switches, audit trails, and multi-agent policy enforcement for AI agents. Rail-agnostic. Works with LangChain, CrewAI, AutoGen, Mastra.">
+<meta property="og:title" content="AgentWallet — Governance Infrastructure for AI Agents">
+<meta property="og:description" content="Every dollar an AI agent spends flows through governance before it moves.">
+<meta property="og:image" content="https://agentwallet.dev/og.png">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Syne:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%;background:#080810;color:#e8e8f0;font-family:'Syne',sans-serif;overflow:hidden}
+
+/* ── HEADER ── */
+.hdr{display:flex;align-items:center;padding:0;border-bottom:1px solid rgba(255,255,255,0.06);background:#080810;flex-shrink:0;height:46px}
+.hdr-logo{padding:0 22px;border-right:1px solid rgba(255,255,255,0.06);display:flex;align-items:center;gap:10px;height:100%}
+.logo-mark{width:22px;height:22px;border:1.5px solid #00e87a;border-radius:5px;display:grid;place-items:center;flex-shrink:0}
+.logo-mark svg{width:11px;height:11px}
+.logo-text{font-size:13px;font-weight:700;letter-spacing:-0.3px;white-space:nowrap}
+.logo-text em{color:#00e87a;font-style:normal}
+.hdr-pill{display:flex;align-items:center;gap:5px;padding:0 16px;border-right:1px solid rgba(255,255,255,0.06);font-family:'Space Mono',monospace;font-size:10px;color:rgba(255,255,255,0.28);letter-spacing:0.5px;height:100%;white-space:nowrap}
+.hdr-pill.live em{color:#00e87a;font-style:normal}
+.blink{width:5px;height:5px;border-radius:50%;background:#00e87a;animation:bk 2s ease-in-out infinite;flex-shrink:0}
+@keyframes bk{0%,100%{opacity:1;box-shadow:0 0 5px #00e87a}50%{opacity:0.25;box-shadow:none}}
+.hdr-stats{display:flex;margin-left:auto;height:100%}
+.hs{padding:0 20px;border-left:1px solid rgba(255,255,255,0.06);display:flex;flex-direction:column;justify-content:center;align-items:flex-end;gap:1px}
+.hs-l{font-size:9px;color:rgba(255,255,255,0.22);font-family:'Space Mono',monospace;letter-spacing:0.8px;text-transform:uppercase}
+.hs-v{font-size:14px;font-weight:700;letter-spacing:-0.5px;font-family:'Space Mono',monospace}
+.hs-v.g{color:#00e87a}.hs-v.r{color:#f04060}.hs-v.a{color:#e8a020}.hs-v.b{color:#4a8ff5}
+
+/* ── BODY ── */
+.body{display:flex;height:calc(100vh - 46px - 38px);overflow:hidden}
+
+/* ── CANVAS ── */
+.canvas-wrap{flex:1;position:relative;overflow:hidden}
+canvas{display:block;width:100%;height:100%}
+.legend{position:absolute;bottom:14px;left:14px;display:flex;flex-direction:column;gap:5px}
+.leg-item{display:flex;align-items:center;gap:6px;font-family:'Space Mono',monospace;font-size:9px;color:rgba(255,255,255,0.3);letter-spacing:0.5px}
+.leg-dot{width:6px;height:6px;border-radius:50%;flex-shrink:0}
+
+/* ── SIDEBAR ── */
+.sidebar{width:260px;border-left:1px solid rgba(255,255,255,0.06);display:flex;flex-direction:column;overflow:hidden;flex-shrink:0;background:#0a0a14}
+.sb-hdr{padding:10px 16px;border-bottom:1px solid rgba(255,255,255,0.06);font-size:9px;color:rgba(255,255,255,0.22);font-family:'Space Mono',monospace;letter-spacing:1.2px;text-transform:uppercase;flex-shrink:0}
+.tx-feed{flex:1;overflow-y:auto;padding:8px}
+.tx-feed::-webkit-scrollbar{width:2px}
+.tx-feed::-webkit-scrollbar-thumb{background:rgba(255,255,255,0.08);border-radius:1px}
+.tx-card{border:1px solid rgba(255,255,255,0.06);border-radius:6px;margin-bottom:6px;overflow:hidden;animation:slideIn 0.2s ease-out;background:rgba(255,255,255,0.015);transition:border-color 0.4s,background 0.4s}
+@keyframes slideIn{from{opacity:0;transform:translateY(-6px)}to{opacity:1;transform:translateY(0)}}
+.tx-card.approved{border-color:rgba(0,232,122,0.2);background:rgba(0,232,122,0.03)}
+.tx-card.rejected{border-color:rgba(240,64,96,0.2);background:rgba(240,64,96,0.03)}
+.tx-card.pending{border-color:rgba(232,160,32,0.2);background:rgba(232,160,32,0.03)}
+.tx-top{display:flex;align-items:center;gap:6px;padding:8px 10px 5px}
+.tx-agent{font-family:'Space Mono',monospace;font-size:9px;color:rgba(255,255,255,0.45);flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.tx-amt{font-family:'Space Mono',monospace;font-size:11px;font-weight:700;color:#e8e8f0;flex-shrink:0}
+.tx-body{padding:0 10px 8px;display:flex;align-items:center;justify-content:space-between;gap:6px}
+.tx-dec{font-family:'Space Mono',monospace;font-size:9px;font-weight:700;letter-spacing:0.5px;white-space:nowrap}
+.tx-dec.approved{color:#00e87a}.tx-dec.rejected{color:#f04060}.tx-dec.pending{color:#e8a020}
+.tx-dec.eval{color:rgba(232,160,32,0.6);animation:pulse 0.8s ease-in-out infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:0.4}}
+.tx-rule{font-family:'Space Mono',monospace;font-size:8px;color:rgba(255,255,255,0.18);text-align:right;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:120px}
+
+/* ── BOTTOM BAR ── */
+.bbar{border-top:1px solid rgba(255,255,255,0.06);padding:0 20px;display:flex;align-items:center;gap:14px;height:38px;flex-shrink:0;background:#080810}
+.bb-item{font-family:'Space Mono',monospace;font-size:9px;color:rgba(255,255,255,0.18);letter-spacing:0.3px;white-space:nowrap}
+.bb-item b{color:rgba(255,255,255,0.45);font-weight:700}
+.bb-item a{color:#00e87a;text-decoration:none;font-weight:700}
+.bb-item a:hover{text-decoration:underline}
+.bb-sep{width:1px;height:10px;background:rgba(255,255,255,0.07);flex-shrink:0}
+.bb-right{margin-left:auto;font-family:'Space Mono',monospace;font-size:9px;color:rgba(0,232,122,0.4);white-space:nowrap}
+
+/* ── INSTALL TOAST ── */
+.toast{position:fixed;bottom:58px;left:50%;transform:translateX(-50%);background:#13131e;border:1px solid rgba(0,232,122,0.25);border-radius:8px;padding:10px 20px;font-family:'Space Mono',monospace;font-size:11px;color:#00e87a;letter-spacing:0.3px;opacity:0;pointer-events:none;transition:opacity 0.3s;z-index:100;white-space:nowrap}
+.toast.show{opacity:1}
+</style>
+</head>
+<body>
+
+<div style="display:flex;flex-direction:column;height:100vh">
+  <div class="hdr">
+    <div class="hdr-logo">
+      <div class="logo-mark">
+        <svg viewBox="0 0 11 11" fill="none"><path d="M2 5.5L4.5 8L9 3" stroke="#00e87a" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </div>
+      <div class="logo-text">Agent<em>Wallet</em></div>
+    </div>
+    <div class="hdr-pill live"><span class="blink"></span><em>LIVE</em>&nbsp;GOVERNANCE</div>
+    <div class="hdr-pill">RAIL-AGNOSTIC</div>
+    <div class="hdr-pill">MCP · REST · SDK</div>
+    <div class="hdr-stats">
+      <div class="hs"><div class="hs-l">Governed</div><div class="hs-v b" id="sv-total">0</div></div>
+      <div class="hs"><div class="hs-l">Block rate</div><div class="hs-v r" id="sv-block">0%</div></div>
+      <div class="hs"><div class="hs-l">Volume</div><div class="hs-v g" id="sv-vol">$0</div></div>
+      <div class="hs"><div class="hs-l">Active agents</div><div class="hs-v a" id="sv-agents">6</div></div>
+    </div>
+  </div>
+
+  <div class="body">
+    <div class="canvas-wrap">
+      <canvas id="gc"></canvas>
+      <div style="position:absolute;inset:0;pointer-events:none">
+        <div class="legend">
+          <div class="leg-item"><div class="leg-dot" style="background:#4a8ff5"></div>Agent node</div>
+          <div class="leg-item"><div class="leg-dot" style="background:#8855ee"></div>Rule gate</div>
+          <div class="leg-item"><div class="leg-dot" style="background:#00e87a"></div>Approved</div>
+          <div class="leg-item"><div class="leg-dot" style="background:#f04060"></div>Blocked</div>
+          <div class="leg-item"><div class="leg-dot" style="background:#e8a020"></div>Pending approval</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="sidebar">
+      <div class="sb-hdr">Transaction feed</div>
+      <div class="tx-feed" id="tx-feed"></div>
+    </div>
+  </div>
+
+  <div class="bbar">
+    <div class="bb-item">pip install <b>agentwallet-gov</b></div>
+    <div class="bb-sep"></div>
+    <div class="bb-item">MCP: <b>9 tools</b></div>
+    <div class="bb-sep"></div>
+    <div class="bb-item">Frameworks: <b>LangChain · CrewAI · AutoGen · Mastra</b></div>
+    <div class="bb-sep"></div>
+    <div class="bb-item">Rails: <b>Coinbase · Stripe · Visa · Mastercard</b></div>
+    <div class="bb-sep"></div>
+    <div class="bb-item"><a href="https://github.com/JackD720/agentwallet-v2" target="_blank">GitHub ↗</a></div>
+    <div class="bb-sep"></div>
+    <div class="bb-item"><a href="https://pypi.org/project/agentwallet-gov/" target="_blank">PyPI ↗</a></div>
+    <div class="bb-right" id="bb-time">—</div>
+  </div>
+</div>
+
+<div class="toast" id="toast">pip install agentwallet-gov copied!</div>
+
+<script>
+const canvas = document.getElementById('gc');
+const ctx = canvas.getContext('2d');
+let W, H, animId;
+
+const C = {
+  agent:'#4a8ff5', rule:'#8855ee',
+  ok:'#00e87a', bad:'#f04060', warn:'#e8a020',
+};
+
+const agentDefs = [
+  {id:'a0',label:'trading-alpha',sub:'$8,240',color:C.agent},
+  {id:'a1',label:'ad-buyer-prod',sub:'$3,100',color:C.agent},
+  {id:'a2',label:'llm-inference',sub:'$12,800',color:C.agent},
+  {id:'a3',label:'child-agent-a',sub:'$250',color:C.agent},
+  {id:'a4',label:'data-pipeline',sub:'$450',color:'rgba(232,160,32,0.7)'},
+  {id:'a5',label:'rogue-007',sub:'TERMINATED',color:'rgba(240,64,96,0.5)'},
+];
+const ruleDefs = [
+  {id:'r0',label:'KILL SWITCH',color:C.rule},
+  {id:'r1',label:'PER TX LIMIT',color:C.rule},
+  {id:'r2',label:'DAILY LIMIT',color:C.rule},
+  {id:'r3',label:'CATEGORY RULES',color:C.rule},
+  {id:'r4',label:'PARENT POLICY',color:C.rule},
+  {id:'r5',label:'AUDIT TRAIL',color:C.rule},
+];
+
+let agentNodes=[], ruleNodes=[];
+
+function layoutNodes(){
+  agentNodes = agentDefs.map((d,i)=>({...d, x:W*0.22, y:H*(i/(agentDefs.length-1)*0.7+0.15), r:26, type:'agent'}));
+  ruleNodes  = ruleDefs.map((d,i)=>({...d, x:W*0.65, y:H*(i/(ruleDefs.length-1)*0.7+0.15), r:20, type:'rule'}));
+}
+
+function resize(){
+  const wrap=canvas.parentElement;
+  const dpr=window.devicePixelRatio||1;
+  W=wrap.clientWidth; H=wrap.clientHeight;
+  canvas.width=W*dpr; canvas.height=H*dpr;
+  ctx.setTransform(dpr,0,0,dpr,0,0);
+  layoutNodes();
+}
+
+class Particle{
+  constructor(src,dst,color){
+    this.src=src; this.dst=dst; this.color=color;
+    this.x=src.x; this.y=src.y;
+    this.t=0; this.speed=0.008+Math.random()*0.006;
+    this.done=false; this.trail=[];
+    this.cx=(src.x+dst.x)/2+(Math.random()<0.5?-1:1)*W*0.05;
+    this.cy=(src.y+dst.y)/2;
+  }
+  update(){
+    this.t=Math.min(1,this.t+this.speed);
+    this.trail.push({x:this.x,y:this.y});
+    if(this.trail.length>18)this.trail.shift();
+    const e=this.t, m=1-e;
+    this.x=m*m*this.src.x+2*m*e*this.cx+e*e*this.dst.x;
+    this.y=m*m*this.src.y+2*m*e*this.cy+e*e*this.dst.y;
+    if(this.t>=1)this.done=true;
+  }
+  draw(){
+    this.trail.forEach((p,i)=>{
+      const a=(i/this.trail.length)*0.45;
+      const s=(i/this.trail.length)*2.5;
+      ctx.beginPath(); ctx.arc(p.x,p.y,s,0,Math.PI*2);
+      ctx.fillStyle=this.color+Math.floor(a*255).toString(16).padStart(2,'0');
+      ctx.fill();
+    });
+    const g=ctx.createRadialGradient(this.x,this.y,0,this.x,this.y,14);
+    g.addColorStop(0,this.color+'99'); g.addColorStop(1,'transparent');
+    ctx.beginPath(); ctx.arc(this.x,this.y,14,0,Math.PI*2);
+    ctx.fillStyle=g; ctx.fill();
+    ctx.beginPath(); ctx.arc(this.x,this.y,3.5,0,Math.PI*2);
+    ctx.fillStyle='#fff'; ctx.fill();
+  }
+}
+
+let particles=[], ripples=[], nodeGlow=new Map();
+
+function addRipple(x,y,color){
+  ripples.push({x,y,color,r:0,alpha:0.8});
+}
+
+function drawNode(n){
+  const glow=nodeGlow.get(n.id)||0;
+  if(glow>0.05){
+    const g=ctx.createRadialGradient(n.x,n.y,n.r,n.x,n.y,n.r+28);
+    g.addColorStop(0,n.color+Math.floor(glow*55).toString(16).padStart(2,'0'));
+    g.addColorStop(1,'transparent');
+    ctx.beginPath(); ctx.arc(n.x,n.y,n.r+28,0,Math.PI*2);
+    ctx.fillStyle=g; ctx.fill();
+  }
+  ctx.beginPath(); ctx.arc(n.x,n.y,n.r,0,Math.PI*2);
+  ctx.strokeStyle=n.color+(n.type==='rule'?'77':'aa');
+  ctx.lineWidth=n.type==='rule'?1:1.5; ctx.stroke();
+  ctx.beginPath(); ctx.arc(n.x,n.y,n.r-2,0,Math.PI*2);
+  ctx.fillStyle=n.color+'12'; ctx.fill();
+
+  ctx.textAlign='center';
+  ctx.fillStyle=n.type==='rule'?'rgba(255,255,255,0.45)':'rgba(255,255,255,0.75)';
+  ctx.font=n.type==='rule'?`500 7.5px 'Space Mono',monospace`:`700 8.5px 'Space Mono',monospace`;
+  ctx.fillText(n.label,n.x,n.y+(n.type==='agent'&&n.sub?-3:3));
+  if(n.type==='agent'&&n.sub){
+    ctx.fillStyle='rgba(255,255,255,0.22)';
+    ctx.font=`400 7.5px 'Space Mono',monospace`;
+    ctx.fillText(n.sub,n.x,n.y+11);
+  }
+  if(n.type==='agent'){
+    ctx.fillStyle='rgba(255,255,255,0.12)';
+    ctx.font=`400 9px 'Syne',sans-serif`;
+    ctx.textAlign='right';
+    ctx.fillText(n.label,n.x-n.r-10,n.y+4);
+  }
+  ctx.textAlign='center';
+}
+
+function draw(){
+  ctx.clearRect(0,0,W,H);
+  // grid
+  ctx.strokeStyle='rgba(255,255,255,0.018)'; ctx.lineWidth=0.5;
+  for(let x=0;x<W;x+=40){ctx.beginPath();ctx.moveTo(x,0);ctx.lineTo(x,H);ctx.stroke();}
+  for(let y=0;y<H;y+=40){ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(W,y);ctx.stroke();}
+  // connections
+  agentNodes.forEach(a=>ruleNodes.forEach(r=>{
+    ctx.beginPath(); ctx.moveTo(a.x+a.r,a.y); ctx.lineTo(r.x-r.r,r.y);
+    ctx.strokeStyle='rgba(255,255,255,0.022)'; ctx.lineWidth=0.5; ctx.stroke();
+  }));
+  agentNodes.forEach(drawNode);
+  ruleNodes.forEach(drawNode);
+  // ripples
+  ripples=ripples.filter(r=>r.alpha>0.015);
+  ripples.forEach(r=>{
+    r.r+=1.8; r.alpha-=0.016;
+    ctx.beginPath(); ctx.arc(r.x,r.y,r.r,0,Math.PI*2);
+    ctx.strokeStyle=r.color+Math.floor(r.alpha*255).toString(16).padStart(2,'0');
+    ctx.lineWidth=1; ctx.stroke();
+  });
+  nodeGlow.forEach((v,k)=>nodeGlow.set(k,v*0.95));
+  particles=particles.filter(p=>!p.done);
+  particles.forEach(p=>{p.update();p.draw();});
+  animId=requestAnimationFrame(draw);
+}
+
+// Stats
+let total=0,blocked=0,vol=0;
+function fmt(n){return n>=1000?'$'+(n/1000).toFixed(1)+'k':'$'+n;}
+function updateStats(){
+  document.getElementById('sv-total').textContent=total;
+  document.getElementById('sv-block').textContent=total?Math.round(blocked/total*100)+'%':'0%';
+  document.getElementById('sv-vol').textContent=fmt(vol);
+}
+
+// Feed
+function addCard(agent,amt,cat,decision,reason){
+  const feed=document.getElementById('tx-feed');
+  const cards=feed.querySelectorAll('.tx-card');
+  if(cards.length>=22)cards[cards.length-1].remove();
+  const icons={approved:'✓ APPROVED',rejected:'✗ BLOCKED',pending:'⏳ PENDING'};
+  const el=document.createElement('div');
+  el.className='tx-card';
+  el.innerHTML=`
+    <div class="tx-top">
+      <div class="tx-agent">${agent}</div>
+      <div class="tx-amt">${fmt(amt)}</div>
+    </div>
+    <div class="tx-body">
+      <div class="tx-dec eval">EVALUATING...</div>
+      <div class="tx-rule">${cat}</div>
+    </div>`;
+  feed.prepend(el);
+  total++; vol+=amt;
+  if(decision==='rejected')blocked++;
+  updateStats();
+  setTimeout(()=>{
+    el.className='tx-card '+decision;
+    el.querySelector('.tx-dec').className='tx-dec '+decision;
+    el.querySelector('.tx-dec').textContent=icons[decision]||decision;
+    if(reason)el.querySelector('.tx-rule').textContent=reason;
+  },1000+Math.random()*800);
+}
+
+// Scenarios
+const SCENARIOS=[
+  {amt:450,cat:'trading',decision:'approved',reason:'all rules pass'},
+  {amt:850,cat:'advertising',decision:'rejected',reason:'PER_TX_LIMIT $500'},
+  {amt:18,cat:'llm-inference',decision:'approved',reason:'all rules pass'},
+  {amt:120,cat:'api-call',decision:'rejected',reason:'PARENT_POLICY 50%'},
+  {amt:2800,cat:'trading',decision:'pending',reason:'REQUIRES_APPROVAL'},
+  {amt:95,cat:'hosting',decision:'approved',reason:'all rules pass'},
+  {amt:75,cat:'advertising',decision:'approved',reason:'all rules pass'},
+  {amt:500,cat:'api-call',decision:'rejected',reason:'AGENT_PAUSED'},
+  {amt:4200,cat:'compute',decision:'pending',reason:'REQUIRES_APPROVAL'},
+  {amt:330,cat:'trading',decision:'approved',reason:'all rules pass'},
+];
+
+let scIdx=0;
+function fire(){
+  const s=SCENARIOS[scIdx%SCENARIOS.length]; scIdx++;
+  const an=agentNodes[Math.floor(Math.random()*agentNodes.length)];
+  const color=s.decision==='approved'?C.ok:s.decision==='rejected'?C.bad:C.warn;
+  nodeGlow.set(an.id,1);
+  const numR=1+Math.floor(Math.random()*3);
+  const rules=[...ruleNodes].sort(()=>Math.random()-0.5).slice(0,numR);
+  let delay=0,prev=an;
+  rules.forEach(rn=>{
+    setTimeout(()=>{
+      particles.push(new Particle(prev,rn,color));
+      nodeGlow.set(rn.id,0.8);
+      addRipple(rn.x,rn.y,color);
+    },delay);
+    delay+=550+Math.random()*280;
+    prev=rn;
+  });
+  setTimeout(()=>{
+    const ex={x:W-10,y:an.y+(Math.random()-0.5)*80,r:0};
+    particles.push(new Particle(prev,ex,color));
+  },delay);
+  addCard(an.label,s.amt,s.cat,s.decision,s.reason);
+}
+
+// Clock
+setInterval(()=>{
+  const el=document.getElementById('bb-time');
+  if(el)el.textContent=new Date().toTimeString().slice(0,8)+' UTC';
+},1000);
+
+// Boot
+resize();
+draw();
+setTimeout(fire,300);
+setTimeout(fire,900);
+setTimeout(fire,1800);
+let fireLoop=()=>{fire();setTimeout(fireLoop,2000+Math.random()*2000);};
+setTimeout(fireLoop,2800);
+
+window.addEventListener('resize',()=>{
+  cancelAnimationFrame(animId);
+  ctx.setTransform(1,0,0,1,0,0);
+  resize();
+  draw();
+});
+</script>
+</body>
+</html>
