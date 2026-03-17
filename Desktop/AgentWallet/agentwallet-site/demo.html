@@ -269,12 +269,12 @@ function draw(){
   // ripples
   ripples=ripples.filter(r=>r.alpha>0.015);
   ripples.forEach(r=>{
-    r.r+=1.8; r.alpha-=0.016;
+    r.r+=1.4; r.alpha-=0.010;
     ctx.beginPath(); ctx.arc(r.x,r.y,r.r,0,Math.PI*2);
     ctx.strokeStyle=r.color+Math.floor(r.alpha*255).toString(16).padStart(2,'0');
     ctx.lineWidth=1; ctx.stroke();
   });
-  nodeGlow.forEach((v,k)=>nodeGlow.set(k,v*0.95));
+  nodeGlow.forEach((v,k)=>nodeGlow.set(k,v*0.982));
   particles=particles.filter(p=>!p.done);
   particles.forEach(p=>{p.update();p.draw();});
   animId=requestAnimationFrame(draw);
@@ -338,13 +338,13 @@ function fire(){
   const an=agentNodes[Math.floor(Math.random()*agentNodes.length)];
   const color=s.decision==='approved'?C.ok:s.decision==='rejected'?C.bad:C.warn;
   nodeGlow.set(an.id,1);
-  const numR=1+Math.floor(Math.random()*3);
+  const numR=2+Math.floor(Math.random()*3);
   const rules=[...ruleNodes].sort(()=>Math.random()-0.5).slice(0,numR);
   let delay=0,prev=an;
   rules.forEach(rn=>{
     setTimeout(()=>{
       particles.push(new Particle(prev,rn,color));
-      nodeGlow.set(rn.id,0.8);
+      nodeGlow.set(rn.id,1.0);
       addRipple(rn.x,rn.y,color);
     },delay);
     delay+=550+Math.random()*280;
