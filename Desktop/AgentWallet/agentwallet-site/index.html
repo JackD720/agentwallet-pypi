@@ -1,0 +1,711 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AgentWallet — Rails for AI Agents</title>
+<meta name="description" content="Spend controls, kill switches, audit trails, and multi-agent policy enforcement for AI agents. Rail-agnostic. Works with LangChain, CrewAI, AutoGen, Mastra.">
+<meta property="og:title" content="AgentWallet — Rails for AI Agents">
+<meta property="og:description" content="Every dollar an AI agent spends flows through governance before it moves.">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:ital,wght@0,400;0,700;1,400&family=Syne:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#080810;
+  --bg2:#0a0a16;
+  --green:#00e87a;
+  --red:#f04060;
+  --amber:#e8a020;
+  --blue:#4a8ff5;
+  --border:rgba(255,255,255,0.07);
+  --text:rgba(255,255,255,0.85);
+  --muted:rgba(255,255,255,0.3);
+  --faint:rgba(255,255,255,0.06);
+}
+html{scroll-behavior:smooth}
+body{background:var(--bg);color:var(--text);font-family:'Syne',sans-serif;overflow-x:hidden;min-height:100vh}
+
+/* ── NOISE OVERLAY ── */
+body::before{
+  content:'';position:fixed;inset:0;
+  background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.04'/%3E%3C/svg%3E");
+  opacity:0.35;pointer-events:none;z-index:0
+}
+
+/* ── SCANLINES ── */
+body::after{
+  content:'';position:fixed;inset:0;
+  background:repeating-linear-gradient(0deg,transparent,transparent 2px,rgba(0,0,0,0.03) 2px,rgba(0,0,0,0.03) 4px);
+  pointer-events:none;z-index:0
+}
+
+/* ── NAV ── */
+nav{
+  position:fixed;top:0;left:0;right:0;z-index:100;
+  display:flex;align-items:center;justify-content:space-between;
+  padding:0 32px;height:52px;
+  background:rgba(8,8,16,0.85);
+  backdrop-filter:blur(20px);
+  border-bottom:1px solid var(--border)
+}
+.nav-logo{display:flex;align-items:center;gap:10px;text-decoration:none}
+.logo-mark{
+  width:24px;height:24px;
+  border:1.5px solid var(--green);border-radius:6px;
+  display:grid;place-items:center;flex-shrink:0
+}
+.logo-mark svg{width:12px;height:12px}
+.logo-text{font-size:14px;font-weight:700;letter-spacing:-0.3px;color:var(--text)}
+.logo-text em{color:var(--green);font-style:normal}
+.nav-links{display:flex;align-items:center;gap:4px}
+.nav-link{
+  padding:6px 14px;border-radius:6px;
+  font-family:'Space Mono',monospace;font-size:10px;
+  color:var(--muted);text-decoration:none;letter-spacing:0.5px;
+  transition:color 0.2s,background 0.2s
+}
+.nav-link:hover{color:var(--text);background:var(--faint)}
+.nav-cta{
+  padding:7px 16px;border-radius:6px;
+  font-family:'Space Mono',monospace;font-size:10px;font-weight:700;
+  color:var(--bg);background:var(--green);text-decoration:none;
+  letter-spacing:0.3px;transition:opacity 0.2s
+}
+.nav-cta:hover{opacity:0.85}
+.live-dot{
+  display:flex;align-items:center;gap:6px;
+  font-family:'Space Mono',monospace;font-size:9px;
+  color:var(--green);letter-spacing:0.8px;margin-right:8px
+}
+.blink{width:5px;height:5px;border-radius:50%;background:var(--green);animation:bk 2s ease-in-out infinite}
+@keyframes bk{0%,100%{opacity:1;box-shadow:0 0 6px var(--green)}50%{opacity:0.2;box-shadow:none}}
+
+/* ── HERO ── */
+.hero{
+  position:relative;z-index:1;
+  min-height:100vh;display:flex;flex-direction:column;
+  align-items:center;justify-content:center;
+  padding:100px 24px 60px;text-align:center;
+  overflow:hidden
+}
+.hero-grid{
+  position:absolute;inset:0;
+  background-image:
+    linear-gradient(var(--border) 1px,transparent 1px),
+    linear-gradient(90deg,var(--border) 1px,transparent 1px);
+  background-size:60px 60px;
+  mask-image:radial-gradient(ellipse 80% 60% at 50% 40%,black 40%,transparent 100%);
+  opacity:0.5
+}
+.hero-glow{
+  position:absolute;top:20%;left:50%;transform:translateX(-50%);
+  width:600px;height:400px;
+  background:radial-gradient(ellipse,rgba(0,232,122,0.08) 0%,transparent 70%);
+  pointer-events:none
+}
+.hero-badge{
+  display:inline-flex;align-items:center;gap:8px;
+  background:rgba(0,232,122,0.07);border:1px solid rgba(0,232,122,0.2);
+  border-radius:100px;padding:5px 14px;
+  font-family:'Space Mono',monospace;font-size:10px;color:var(--green);
+  letter-spacing:0.8px;margin-bottom:28px;
+  animation:fadeUp 0.6s ease-out both
+}
+@keyframes fadeUp{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}}
+
+.hero-h1{
+  font-size:clamp(42px,7vw,88px);font-weight:800;
+  letter-spacing:-2.5px;line-height:0.95;
+  margin-bottom:24px;
+  animation:fadeUp 0.6s ease-out 0.1s both
+}
+.hero-h1 em{color:var(--green);font-style:normal}
+.hero-h1 span{
+  display:block;font-size:clamp(28px,4.5vw,58px);
+  color:var(--muted);font-weight:600;letter-spacing:-1.5px;
+  margin-top:8px
+}
+.hero-sub{
+  max-width:560px;font-size:16px;line-height:1.65;
+  color:var(--muted);margin-bottom:40px;
+  animation:fadeUp 0.6s ease-out 0.2s both
+}
+.hero-actions{
+  display:flex;align-items:center;gap:12px;flex-wrap:wrap;
+  justify-content:center;margin-bottom:60px;
+  animation:fadeUp 0.6s ease-out 0.3s both
+}
+.btn-primary{
+  display:flex;align-items:center;gap:8px;
+  padding:12px 24px;border-radius:8px;
+  background:var(--green);color:#080810;
+  font-family:'Space Mono',monospace;font-size:11px;font-weight:700;
+  text-decoration:none;letter-spacing:0.3px;
+  transition:transform 0.15s,opacity 0.15s
+}
+.btn-primary:hover{transform:translateY(-1px);opacity:0.9}
+.btn-secondary{
+  display:flex;align-items:center;gap:8px;
+  padding:12px 24px;border-radius:8px;
+  background:rgba(255,255,255,0.05);border:1px solid var(--border);color:var(--text);
+  font-family:'Space Mono',monospace;font-size:11px;
+  text-decoration:none;letter-spacing:0.3px;
+  transition:background 0.15s,border-color 0.15s
+}
+.btn-secondary:hover{background:rgba(255,255,255,0.08);border-color:rgba(255,255,255,0.15)}
+.hero-install{
+  display:flex;align-items:center;gap:10px;
+  background:rgba(255,255,255,0.03);border:1px solid var(--border);
+  border-radius:8px;padding:10px 16px;cursor:pointer;
+  font-family:'Space Mono',monospace;font-size:11px;color:var(--muted);
+  transition:border-color 0.2s;
+  animation:fadeUp 0.6s ease-out 0.35s both
+}
+.hero-install:hover{border-color:rgba(0,232,122,0.3)}
+.hero-install code{color:var(--text)}
+.hero-install span{font-size:9px;color:rgba(255,255,255,0.2);letter-spacing:0.5px}
+
+/* ── TERMINAL ── */
+.terminal-wrap{
+  width:100%;max-width:760px;
+  border:1px solid var(--border);border-radius:12px;
+  overflow:hidden;background:var(--bg2);
+  box-shadow:0 40px 80px rgba(0,0,0,0.5),0 0 0 1px rgba(255,255,255,0.04);
+  animation:fadeUp 0.7s ease-out 0.45s both
+}
+.term-bar{
+  display:flex;align-items:center;gap:8px;
+  padding:12px 16px;border-bottom:1px solid var(--border);
+  background:rgba(255,255,255,0.02)
+}
+.term-dot{width:10px;height:10px;border-radius:50%}
+.term-title{
+  flex:1;text-align:center;
+  font-family:'Space Mono',monospace;font-size:10px;
+  color:rgba(255,255,255,0.2);letter-spacing:0.5px
+}
+.term-body{
+  padding:16px 20px;min-height:260px;
+  font-family:'Space Mono',monospace;font-size:11px;line-height:1.8;
+  overflow:hidden
+}
+.term-line{opacity:0;animation:termIn 0.15s ease-out forwards}
+@keyframes termIn{to{opacity:1}}
+.t-dim{color:rgba(255,255,255,0.18)}
+.t-ok{color:var(--green)}
+.t-bad{color:var(--red)}
+.t-warn{color:var(--amber)}
+.t-blue{color:var(--blue)}
+.t-muted{color:rgba(255,255,255,0.35)}
+.t-white{color:rgba(255,255,255,0.75)}
+.cursor{display:inline-block;width:7px;height:13px;background:var(--green);animation:cur 1s step-end infinite;vertical-align:middle;margin-left:2px}
+@keyframes cur{0%,100%{opacity:1}50%{opacity:0}}
+
+/* ── STATS ROW ── */
+.stats-row{
+  position:relative;z-index:1;
+  display:flex;justify-content:center;gap:0;
+  border-top:1px solid var(--border);border-bottom:1px solid var(--border);
+  background:var(--bg2);overflow:hidden
+}
+.stat{
+  flex:1;max-width:200px;
+  padding:28px 24px;text-align:center;
+  border-right:1px solid var(--border)
+}
+.stat:last-child{border-right:none}
+.stat-val{
+  font-size:32px;font-weight:800;letter-spacing:-1px;
+  color:var(--green);font-family:'Space Mono',monospace;
+  margin-bottom:4px
+}
+.stat-lbl{
+  font-size:10px;color:var(--muted);
+  font-family:'Space Mono',monospace;letter-spacing:1px;text-transform:uppercase
+}
+
+/* ── FEATURES ── */
+.section{
+  position:relative;z-index:1;
+  padding:80px 32px;max-width:1100px;margin:0 auto
+}
+.section-tag{
+  font-family:'Space Mono',monospace;font-size:10px;
+  color:var(--green);letter-spacing:1.5px;text-transform:uppercase;
+  margin-bottom:12px
+}
+.section-h2{
+  font-size:clamp(28px,4vw,44px);font-weight:800;
+  letter-spacing:-1.5px;margin-bottom:16px
+}
+.section-sub{
+  font-size:15px;color:var(--muted);line-height:1.7;
+  max-width:520px;margin-bottom:48px
+}
+.features-grid{
+  display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:16px
+}
+.feat{
+  background:var(--bg2);border:1px solid var(--border);
+  border-radius:12px;padding:28px;
+  transition:border-color 0.2s,transform 0.2s
+}
+.feat:hover{border-color:rgba(0,232,122,0.25);transform:translateY(-2px)}
+.feat-icon{
+  width:36px;height:36px;border-radius:8px;
+  background:rgba(0,232,122,0.08);border:1px solid rgba(0,232,122,0.15);
+  display:grid;place-items:center;margin-bottom:16px
+}
+.feat-icon svg{width:16px;height:16px}
+.feat-title{font-size:15px;font-weight:700;margin-bottom:8px;letter-spacing:-0.3px}
+.feat-desc{font-size:13px;color:var(--muted);line-height:1.65}
+
+/* ── HOW IT WORKS ── */
+.how-grid{
+  display:grid;grid-template-columns:1fr 1fr;gap:48px;align-items:center
+}
+@media(max-width:768px){.how-grid{grid-template-columns:1fr}}
+.steps{display:flex;flex-direction:column;gap:0}
+.step{
+  display:flex;gap:20px;padding:20px 0;
+  border-bottom:1px solid var(--border)
+}
+.step:last-child{border-bottom:none}
+.step-num{
+  width:28px;height:28px;border-radius:6px;
+  border:1px solid var(--border);
+  display:grid;place-items:center;flex-shrink:0;
+  font-family:'Space Mono',monospace;font-size:10px;
+  color:var(--muted);margin-top:2px
+}
+.step-title{font-size:14px;font-weight:700;margin-bottom:4px;letter-spacing:-0.2px}
+.step-desc{font-size:13px;color:var(--muted);line-height:1.6}
+.code-block{
+  background:var(--bg2);border:1px solid var(--border);
+  border-radius:12px;overflow:hidden
+}
+.code-bar{
+  display:flex;align-items:center;gap:8px;
+  padding:10px 16px;border-bottom:1px solid var(--border);
+  background:rgba(255,255,255,0.02)
+}
+.code-bar span{font-family:'Space Mono',monospace;font-size:10px;color:var(--muted)}
+.code-content{padding:20px;font-family:'Space Mono',monospace;font-size:12px;line-height:1.9}
+.c-grey{color:rgba(255,255,255,0.25)}
+.c-green{color:var(--green)}
+.c-blue{color:#7eb6ff}
+.c-amber{color:var(--amber)}
+.c-purple{color:#b07af5}
+.c-white{color:rgba(255,255,255,0.8)}
+
+/* ── INTEGRATIONS ── */
+.integrations{
+  position:relative;z-index:1;
+  padding:60px 32px;
+  border-top:1px solid var(--border);border-bottom:1px solid var(--border);
+  background:var(--bg2);text-align:center
+}
+.int-label{
+  font-family:'Space Mono',monospace;font-size:10px;
+  color:var(--muted);letter-spacing:1.2px;margin-bottom:24px
+}
+.int-grid{
+  display:flex;flex-wrap:wrap;justify-content:center;gap:10px;max-width:800px;margin:0 auto
+}
+.int-badge{
+  padding:7px 16px;border-radius:100px;
+  background:rgba(255,255,255,0.04);border:1px solid var(--border);
+  font-family:'Space Mono',monospace;font-size:10px;color:var(--muted);
+  letter-spacing:0.3px;transition:border-color 0.2s,color 0.2s
+}
+.int-badge:hover{border-color:rgba(0,232,122,0.3);color:var(--green)}
+.int-badge.hl{border-color:rgba(0,232,122,0.2);color:rgba(0,232,122,0.7)}
+
+/* ── CTA ── */
+.cta-section{
+  position:relative;z-index:1;
+  padding:100px 32px;text-align:center;overflow:hidden
+}
+.cta-glow{
+  position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);
+  width:800px;height:400px;
+  background:radial-gradient(ellipse,rgba(0,232,122,0.06) 0%,transparent 70%);
+  pointer-events:none
+}
+.cta-h2{
+  font-size:clamp(32px,5vw,56px);font-weight:800;
+  letter-spacing:-2px;margin-bottom:16px
+}
+.cta-sub{
+  font-size:16px;color:var(--muted);max-width:480px;
+  margin:0 auto 40px;line-height:1.65
+}
+.cta-actions{display:flex;justify-content:center;gap:12px;flex-wrap:wrap}
+
+/* ── FOOTER ── */
+footer{
+  border-top:1px solid var(--border);
+  padding:24px 32px;
+  display:flex;align-items:center;justify-content:space-between;
+  flex-wrap:wrap;gap:16px;
+  position:relative;z-index:1
+}
+.footer-left{
+  font-family:'Space Mono',monospace;font-size:9px;
+  color:rgba(255,255,255,0.2);letter-spacing:0.5px
+}
+.footer-links{display:flex;gap:20px}
+.footer-link{
+  font-family:'Space Mono',monospace;font-size:9px;
+  color:rgba(255,255,255,0.25);text-decoration:none;
+  transition:color 0.2s;letter-spacing:0.5px
+}
+.footer-link:hover{color:var(--green)}
+
+/* ── TOAST ── */
+.toast{
+  position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(10px);
+  background:#13131e;border:1px solid rgba(0,232,122,0.3);
+  border-radius:8px;padding:10px 20px;
+  font-family:'Space Mono',monospace;font-size:11px;color:var(--green);
+  opacity:0;pointer-events:none;transition:opacity 0.2s,transform 0.2s;
+  z-index:999;white-space:nowrap
+}
+.toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+
+@media(max-width:600px){
+  .nav-links{display:none}
+  .stats-row{flex-wrap:wrap}
+  .stat{min-width:50%;border-bottom:1px solid var(--border)}
+}
+</style>
+</head>
+<body>
+
+<!-- NAV -->
+<nav>
+  <a href="#" class="nav-logo">
+    <div class="logo-mark">
+      <svg viewBox="0 0 12 12" fill="none"><path d="M2 6L5 9L10 3" stroke="#00e87a" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    </div>
+    <div class="logo-text">Agent<em>Wallet</em></div>
+  </a>
+  <div class="nav-links">
+    <div class="live-dot"><span class="blink"></span>LIVE GOVERNANCE</div>
+    <a href="https://github.com/JackD720/agentwallet-v2" target="_blank" class="nav-link">DOCS</a>
+    <a href="https://pypi.org/project/agentwallet-gov/" target="_blank" class="nav-link">PYPI</a>
+    <a href="/demo.html" class="nav-link">DEMO</a>
+  </div>
+  <a href="https://github.com/JackD720/agentwallet-v2" target="_blank" class="nav-cta">GITHUB ↗</a>
+</nav>
+
+<!-- HERO -->
+<section class="hero">
+  <div class="hero-grid"></div>
+  <div class="hero-glow"></div>
+
+  <div class="hero-badge">
+    <span class="blink"></span>
+    RAIL-AGNOSTIC · MCP · REST · SDK
+  </div>
+
+  <h1 class="hero-h1">
+    <em>Rails</em> for<br>AI Agents
+    <span>Every spend. Governed.</span>
+  </h1>
+
+  <p class="hero-sub">
+    Spend controls, kill switches, audit trails, and multi-agent policy enforcement. AgentWallet sits between your agents and every payment rail — so you stay in control.
+  </p>
+
+  <div class="hero-actions">
+    <a href="https://github.com/JackD720/agentwallet-v2" target="_blank" class="btn-primary">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.374 0 0 5.373 0 12c0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23A11.509 11.509 0 0112 5.803c1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576C20.566 21.797 24 17.3 24 12c0-6.627-5.373-12-12-12z"/></svg>
+      GET STARTED
+    </a>
+    <a href="/demo.html" class="btn-secondary">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polygon points="10 8 16 12 10 16 10 8" fill="currentColor" stroke="none"/></svg>
+      LIVE DEMO
+    </a>
+  </div>
+
+  <div class="hero-install" onclick="copyInstall()" title="Click to copy">
+    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--green)" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
+    <code>pip install agentwallet-gov</code>
+    <span>CLICK TO COPY</span>
+  </div>
+
+  <br>
+
+  <!-- TERMINAL -->
+  <div class="terminal-wrap">
+    <div class="term-bar">
+      <div class="term-dot" style="background:#f04060"></div>
+      <div class="term-dot" style="background:#e8a020"></div>
+      <div class="term-dot" style="background:#00e87a"></div>
+      <div class="term-title">agentwallet — governance runtime</div>
+    </div>
+    <div class="term-body" id="terminal"></div>
+  </div>
+</section>
+
+<!-- STATS -->
+<div class="stats-row">
+  <div class="stat">
+    <div class="stat-val">9</div>
+    <div class="stat-lbl">MCP Tools</div>
+  </div>
+  <div class="stat">
+    <div class="stat-val">4</div>
+    <div class="stat-lbl">Frameworks</div>
+  </div>
+  <div class="stat">
+    <div class="stat-val">4</div>
+    <div class="stat-lbl">Payment Rails</div>
+  </div>
+  <div class="stat">
+    <div class="stat-val">&lt;10ms</div>
+    <div class="stat-lbl">Policy Eval</div>
+  </div>
+  <div class="stat">
+    <div class="stat-val">∞</div>
+    <div class="stat-lbl">Audit Trail</div>
+  </div>
+</div>
+
+<!-- FEATURES -->
+<section class="section">
+  <div class="section-tag">// WHAT WE DO</div>
+  <h2 class="section-h2">Governance before<br>money moves</h2>
+  <p class="section-sub">Six policy primitives that sit between your agents and every payment rail. Rail-agnostic by design.</p>
+
+  <div class="features-grid">
+    <div class="feat">
+      <div class="feat-icon">
+        <svg viewBox="0 0 16 16" fill="none" stroke="#00e87a" stroke-width="1.5"><path d="M8 1L2 4v4c0 3.5 2.5 5.8 6 7 3.5-1.2 6-3.5 6-7V4L8 1z"/></svg>
+      </div>
+      <div class="feat-title">Kill Switch</div>
+      <div class="feat-desc">Instantly halt all agent spending with a single API call. Cascade to child agents. No transaction passes once triggered.</div>
+    </div>
+    <div class="feat">
+      <div class="feat-icon">
+        <svg viewBox="0 0 16 16" fill="none" stroke="#00e87a" stroke-width="1.5"><rect x="1" y="4" width="14" height="9" rx="2"/><path d="M5 4V3a3 3 0 016 0v1"/><circle cx="8" cy="8.5" r="1.5" fill="#00e87a"/></svg>
+      </div>
+      <div class="feat-title">Spend Limits</div>
+      <div class="feat-desc">Per-transaction caps, daily budgets, and category-level controls. Enforce before execution, not after the damage is done.</div>
+    </div>
+    <div class="feat">
+      <div class="feat-icon">
+        <svg viewBox="0 0 16 16" fill="none" stroke="#00e87a" stroke-width="1.5"><circle cx="8" cy="8" r="6"/><path d="M8 4v4l3 2"/></svg>
+      </div>
+      <div class="feat-title">Dead Man's Switch</div>
+      <div class="feat-desc">Heartbeat monitoring with automatic escalation. If an agent goes silent, governance kicks in before rogue spending can occur.</div>
+    </div>
+    <div class="feat">
+      <div class="feat-icon">
+        <svg viewBox="0 0 16 16" fill="none" stroke="#00e87a" stroke-width="1.5"><path d="M2 4h12M2 8h8M2 12h5"/></svg>
+      </div>
+      <div class="feat-title">Immutable Audit Trail</div>
+      <div class="feat-desc">Every decision — approved, blocked, pending — is logged with full context. Compliance-ready, tamper-evident records.</div>
+    </div>
+    <div class="feat">
+      <div class="feat-icon">
+        <svg viewBox="0 0 16 16" fill="none" stroke="#00e87a" stroke-width="1.5"><circle cx="5" cy="8" r="3"/><circle cx="11" cy="5" r="2"/><circle cx="11" cy="11" r="2"/><path d="M8 8l2-2M8 8l2 2"/></svg>
+      </div>
+      <div class="feat-title">Parent-Child Policy</div>
+      <div class="feat-desc">Multi-agent governance trees. Child agents inherit parent constraints. Spawned agents can't exceed their parent's limits.</div>
+    </div>
+    <div class="feat">
+      <div class="feat-icon">
+        <svg viewBox="0 0 16 16" fill="none" stroke="#00e87a" stroke-width="1.5"><path d="M3 8h10M8 3l5 5-5 5"/></svg>
+      </div>
+      <div class="feat-title">Approval Workflows</div>
+      <div class="feat-desc">Route high-value transactions for human review. Set thresholds, assign approvers, and unblock with a single confirmation.</div>
+    </div>
+  </div>
+</section>
+
+<!-- HOW IT WORKS -->
+<section class="section" style="border-top:1px solid var(--border)">
+  <div class="how-grid">
+    <div>
+      <div class="section-tag">// HOW IT WORKS</div>
+      <h2 class="section-h2">Drop in.<br>Govern everything.</h2>
+      <p class="section-sub">Three lines to wrap any agent framework. Works with whatever you're already using.</p>
+      <div class="steps">
+        <div class="step">
+          <div class="step-num">01</div>
+          <div>
+            <div class="step-title">Install the SDK</div>
+            <div class="step-desc">One pip install. Python SDK with native support for LangChain, CrewAI, AutoGen, and Mastra.</div>
+          </div>
+        </div>
+        <div class="step">
+          <div class="step-num">02</div>
+          <div>
+            <div class="step-title">Define your policies</div>
+            <div class="step-desc">Set spend limits, category rules, and approval thresholds per agent or agent tree.</div>
+          </div>
+        </div>
+        <div class="step">
+          <div class="step-num">03</div>
+          <div>
+            <div class="step-title">Every transaction is governed</div>
+            <div class="step-desc">AgentWallet intercepts spending before it reaches any rail — Coinbase, Stripe, Visa, Mastercard.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="code-block">
+      <div class="code-bar">
+        <div class="term-dot" style="background:#f04060"></div>
+        <div class="term-dot" style="background:#e8a020"></div>
+        <div class="term-dot" style="background:#00e87a"></div>
+        <span>quickstart.py</span>
+      </div>
+      <div class="code-content">
+<span class="c-purple">from</span> <span class="c-white">agentwallet</span> <span class="c-purple">import</span> <span class="c-white">AgentWallet</span><br>
+<br>
+<span class="c-grey"># Initialize governance</span><br>
+<span class="c-white">wallet</span> <span class="c-blue">=</span> <span class="c-green">AgentWallet</span>(<br>
+&nbsp;&nbsp;<span class="c-amber">agent_id</span><span class="c-blue">=</span><span class="c-green">"trading-alpha"</span>,<br>
+&nbsp;&nbsp;<span class="c-amber">daily_limit</span><span class="c-blue">=</span><span class="c-white">5000</span>,<br>
+&nbsp;&nbsp;<span class="c-amber">per_tx_limit</span><span class="c-blue">=</span><span class="c-white">500</span>,<br>
+&nbsp;&nbsp;<span class="c-amber">categories</span><span class="c-blue">=</span>[<span class="c-green">"trading"</span>, <span class="c-green">"data"</span>]<br>
+)<br>
+<br>
+<span class="c-grey"># Authorize a spend</span><br>
+<span class="c-white">result</span> <span class="c-blue">=</span> <span class="c-purple">await</span> <span class="c-white">wallet</span>.<span class="c-green">authorize</span>({<br>
+&nbsp;&nbsp;<span class="c-amber">"amount"</span>: <span class="c-white">120</span>,<br>
+&nbsp;&nbsp;<span class="c-amber">"category"</span>: <span class="c-green">"trading"</span>,<br>
+&nbsp;&nbsp;<span class="c-amber">"rail"</span>: <span class="c-green">"coinbase"</span><br>
+})<br>
+<br>
+<span class="c-grey"># ✓ APPROVED — all rules pass</span><br>
+<span class="c-white">print</span>(<span class="c-white">result</span>.<span class="c-amber">status</span>) <span class="c-grey"># → "approved"</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- INTEGRATIONS -->
+<div class="integrations">
+  <div class="int-label">WORKS WITH EVERY RAIL AND FRAMEWORK</div>
+  <div class="int-grid">
+    <div class="int-badge hl">Coinbase</div>
+    <div class="int-badge hl">Stripe x402</div>
+    <div class="int-badge hl">Visa</div>
+    <div class="int-badge hl">Mastercard</div>
+    <div class="int-badge">LangChain</div>
+    <div class="int-badge">CrewAI</div>
+    <div class="int-badge">AutoGen</div>
+    <div class="int-badge">Mastra</div>
+    <div class="int-badge">MCP (9 tools)</div>
+    <div class="int-badge">REST API</div>
+    <div class="int-badge">Python SDK</div>
+    <div class="int-badge">npm package</div>
+  </div>
+</div>
+
+<!-- CTA -->
+<section class="cta-section">
+  <div class="cta-glow"></div>
+  <h2 class="cta-h2">Your agents are spending.<br><em>Are you watching?</em></h2>
+  <p class="cta-sub">AgentWallet is the governance layer the agentic economy needs. Start in minutes.</p>
+  <div class="cta-actions">
+    <a href="https://github.com/JackD720/agentwallet-v2" target="_blank" class="btn-primary">READ THE DOCS ↗</a>
+    <a href="/demo.html" class="btn-secondary">▶ WATCH IT LIVE</a>
+  </div>
+</section>
+
+<!-- FOOTER -->
+<footer>
+  <div class="footer-left">© 2026 AGENTWALLET · GOVERNANCE INFRASTRUCTURE FOR AI AGENTS</div>
+  <div class="footer-links">
+    <a href="https://github.com/JackD720/agentwallet-v2" target="_blank" class="footer-link">GITHUB</a>
+    <a href="https://pypi.org/project/agentwallet-gov/" target="_blank" class="footer-link">PYPI</a>
+    <a href="/demo.html" class="footer-link">DEMO</a>
+  </div>
+</footer>
+
+<div class="toast" id="toast">Copied to clipboard!</div>
+
+<script>
+// ── TERMINAL ANIMATION ──
+const lines = [
+  {t:200,  html:`<span class="t-dim">$</span> <span class="t-white">python -c "from agentwallet import AgentWallet; print('ready')"</span>`},
+  {t:900,  html:`<span class="t-ok">ready</span>`},
+  {t:1400, html:`<span class="t-dim">$</span> <span class="t-white">aw govern --agent trading-alpha --daily-limit 5000</span>`},
+  {t:2000, html:`<span class="t-ok">✓</span> <span class="t-muted">governance active · agent=</span><span class="t-blue">trading-alpha</span>`},
+  {t:2400, html:`<span class="t-ok">✓</span> <span class="t-muted">kill switch armed · heartbeat interval=</span><span class="t-white">30s</span>`},
+  {t:2800, html:`<span class="t-ok">✓</span> <span class="t-muted">audit trail initialized · rail=</span><span class="t-white">coinbase+stripe</span>`},
+  {t:3400, html:`<span class="t-dim">───────────────────────────────────────────</span>`},
+  {t:3800, html:`<span class="t-muted">incoming tx  </span><span class="t-white">$120.00</span> <span class="t-muted">category=</span><span class="t-white">trading</span>`},
+  {t:4200, html:`<span class="t-muted">evaluating   </span><span class="t-warn">per_tx_limit $500</span> <span class="t-ok">→ PASS</span>`},
+  {t:4500, html:`<span class="t-muted">evaluating   </span><span class="t-warn">daily_limit $5000</span> <span class="t-ok">→ PASS (used $640)</span>`},
+  {t:4800, html:`<span class="t-muted">evaluating   </span><span class="t-warn">category_rules</span> <span class="t-ok">→ PASS</span>`},
+  {t:5200, html:`<span class="t-ok">✓ APPROVED</span>  <span class="t-muted">routing to coinbase · latency=</span><span class="t-white">7ms</span>`},
+  {t:5800, html:`<span class="t-dim">───────────────────────────────────────────</span>`},
+  {t:6200, html:`<span class="t-muted">incoming tx  </span><span class="t-white">$850.00</span> <span class="t-muted">category=</span><span class="t-white">advertising</span>`},
+  {t:6600, html:`<span class="t-muted">evaluating   </span><span class="t-warn">per_tx_limit $500</span> <span class="t-bad">→ FAIL ($850 > $500)</span>`},
+  {t:7000, html:`<span class="t-bad">✗ BLOCKED</span>   <span class="t-muted">reason=</span><span class="t-white">PER_TX_LIMIT · tx halted</span>`},
+  {t:7600, html:`<span class="t-dim">───────────────────────────────────────────</span>`},
+  {t:8000, html:`<span class="t-muted">incoming tx  </span><span class="t-white">$4,200.00</span> <span class="t-muted">category=</span><span class="t-white">compute</span>`},
+  {t:8400, html:`<span class="t-muted">evaluating   </span><span class="t-warn">approval_threshold $1000</span> <span class="t-warn">→ ESCALATE</span>`},
+  {t:8800, html:`<span class="t-warn">⏳ PENDING</span>  <span class="t-muted">awaiting human approval · notified owner</span>`},
+];
+
+const terminal = document.getElementById('terminal');
+let cursor = null;
+
+lines.forEach(({t, html}) => {
+  setTimeout(() => {
+    if(cursor) cursor.remove();
+    const div = document.createElement('div');
+    div.className = 'term-line';
+    div.style.animationDelay = '0ms';
+    div.innerHTML = html;
+    terminal.appendChild(div);
+    cursor = document.createElement('span');
+    cursor.className = 'cursor';
+    terminal.appendChild(cursor);
+    terminal.scrollTop = terminal.scrollHeight;
+  }, t);
+});
+
+// Loop
+setTimeout(() => {
+  if(cursor) cursor.remove();
+  setInterval(() => {
+    const div = document.createElement('div');
+    const outcomes = [
+      `<span class="t-ok">✓ APPROVED</span>  <span class="t-muted">$${Math.floor(Math.random()*400+50)} · all rules pass · ${Math.floor(Math.random()*8+3)}ms</span>`,
+      `<span class="t-bad">✗ BLOCKED</span>   <span class="t-muted">$${Math.floor(Math.random()*1000+500)} · PER_TX_LIMIT exceeded</span>`,
+      `<span class="t-warn">⏳ PENDING</span>  <span class="t-muted">$${Math.floor(Math.random()*5000+1000)} · awaiting approval</span>`,
+    ];
+    div.className = 'term-line';
+    div.style.animationDelay = '0ms';
+    div.innerHTML = outcomes[Math.floor(Math.random()*outcomes.length)];
+    if(cursor) cursor.remove();
+    terminal.appendChild(div);
+    cursor = document.createElement('span');
+    cursor.className = 'cursor';
+    terminal.appendChild(cursor);
+    if(terminal.children.length > 40) terminal.firstChild.remove();
+    terminal.scrollTop = terminal.scrollHeight;
+  }, 2200 + Math.random()*1800);
+}, 10000);
+
+// ── COPY INSTALL ──
+function copyInstall(){
+  navigator.clipboard.writeText('pip install agentwallet-gov').then(()=>{
+    const t = document.getElementById('toast');
+    t.classList.add('show');
+    setTimeout(()=>t.classList.remove('show'), 2000);
+  });
+}
+</script>
+</body>
+</html>
